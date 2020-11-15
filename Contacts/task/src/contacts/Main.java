@@ -12,157 +12,133 @@ public class Main {
 
     private static final Pattern PHONE_PATTERN = Pattern.compile("\\+?((\\(\\w+\\)([\\s-]\\w{2,})?)|(\\w+([\\s-]\\(\\w{2,}\\))?))([\\s-]\\w{2,}){0,3}");
     private static final Pattern DATE_PATTERN = Pattern.compile("^(0?[1-9]|[12][0-9])\\.(0?[1-9]|1[012])\\.(19|20)\\d\\d$");
-    private static final String ENTER_ACTION = "\nEnter action (add, remove, edit, count, info, exit):";
+    private static final String MAIN_MENU = "\n[menu] Enter action (add, list, search, count, exit):";
+    private static final String CONTACT_MENU = "\n[record] Enter action (edit, delete, menu):";
+    private static final String LIST_MENU = "\n[list] Enter action ([number], back):";
     private static final List<Contact> contactList = new ArrayList<>();
     private static final Scanner sc = new Scanner(System.in);
 
     public static void main(String[] args) {
-        print(ENTER_ACTION);
-        String input = sc.nextLine();
 
         while (true) {
-            handleUserInput(input);
-
-            print(ENTER_ACTION);
-            input = sc.nextLine();
+            handleMainMenuCommands();
         }
     }
 
-    private static void handleUserInput(String input) {
+    private static void handleMainMenuCommands() {
+        String input = getStringReplyToMsg(MAIN_MENU);
+
         switch (input) {
             case "add":
                 createContact();
                 break;
-            case "remove":
-                deleteContact();
-                break;
-            case "edit":
-                editContact();
+            case "search":
+                search();
                 break;
             case "count":
                 printSizeOfContactList();
                 break;
-            case "info":
-                showInfo();
+            case "list":
+                listCommand();
                 break;
             case "exit":
                 System.exit(0);
                 break;
             default:
-                print("Use following commands...");
-                print(ENTER_ACTION);
+                input = sc.nextLine();
         }
     }
 
-    private static void editContact() {
-        if (contactList.size() == 0) {
-            print("No records to edit!");
-            return;
+    private static void search() {
+        String reply = getStringReplyToMsg("Enter search query:");
+        Pattern pattern = Pattern.compile(reply, Pattern.CASE_INSENSITIVE);
+
+        List<Contact> searchResult = new ArrayList<>();
+
+        for (Contact contact : contactList) {
+            Matcher matcher = pattern.matcher(contact.toString());
+            if (matcher.find()) {
+                searchResult.add(contact);
+            }
         }
 
-        printContactList();
+        printList(searchResult);
 
-        int index = Integer.parseInt(getStringReplyToMsg("Select a record:"));
-        Contact contact = contactList.get(index - 1);
+        reply = getStringReplyToMsg("\n[search] Enter action ([number], back, again):");
 
-        if (contact.isPerson()) {
-            Person person = (Person) contact;
-            editPerson(person);
-        } else {
-            Organization organization = (Organization) contact;
-            editOrganization(organization);
+        if ("again".equals(reply)) {
+            search();
+        } else if (reply.equals("back")) {
+            print(MAIN_MENU);
+        } else if (isDigit(reply)) {
+            int index = Integer.parseInt(reply) - 1;
+            Contact contact = searchResult.get(index);
+            print(contact.toString());
+
+            handleContactMenuCommands(contact);
         }
     }
 
-    private static void editOrganization(Organization organization) {
-        String field = getStringReplyToMsg("Select a field (name, address, number):");
+    private static void handleContactMenuCommands(Contact contact) {
+        String reply = getStringReplyToMsg(CONTACT_MENU);
 
-        switch (field) {
-            case "name":
-                String newName = getStringReplyToMsg("Enter name:");
-                organization.setName(newName);
+        switch (reply) {
+            case "delete":
+                deleteContact(contact);
                 break;
-            case "address":
-                String newAddress = getStringReplyToMsg("Enter address:");
-                organization.setAddress(newAddress);
+            case "edit":
+                editContact(contact);
                 break;
-            case "number":
-                String newNumber = getStringReplyToMsg("Enter number:");
-                organization.setPhone(newNumber);
-                break;
-            default:
-                print(ENTER_ACTION);
+            case "menu":
+                handleMainMenuCommands();
         }
-
-        organization.setLastModifiedAt(LocalDateTime.now());
-        print("The record updated!");
     }
 
-    private static void editPerson(Person person) {
-        String field = getStringReplyToMsg("Select a field (name, surname, birth, gender, number):");
+    private static void editContact(Contact contact) {
+        String fieldName = getStringReplyToMsg("Select a field " + contact.getFieldsAbleToChange());
+        String fieldValue = getStringReplyToMsg("Enter " + fieldName);
 
-        switch (field) {
-            case "name":
-                String newName = getStringReplyToMsg("Enter name:");
-                person.setName(newName);
-                break;
-            case "surname":
-                String newSurname = getStringReplyToMsg("Enter surname:");
-                person.setSurname(newSurname);
-                break;
-            case "birth":
-                String newBirthday = getStringReplyToMsg("Enter birth date:");
-                person.setBirthday(newBirthday);
-                break;
-            case "gender":
-                String newGender = getStringReplyToMsg("Enter gender:");
-                person.setGender(newGender);
-                break;
-            case "number":
-                String newNumber = getStringReplyToMsg("Enter number:");
-                person.setPhone(newNumber);
-                break;
-            default:
-                print(ENTER_ACTION);
-        }
+        contact.setValueByFieldName(fieldName, fieldValue);
 
-        person.setLastModifiedAt(LocalDateTime.now());
-        print("The record updated!");
+        print("Saved");
+
+        print(contact.toString());
+        handleContactMenuCommands(contact);
     }
 
-    private static void deleteContact() {
-        if (contactList.size() == 0) {
-            print("No records to remove!");
-            return;
-        }
-
-        printContactList();
-
-        int index = Integer.parseInt(getStringReplyToMsg("Select a record:"));
-
-        contactList.remove(index - 1);
+    private static void deleteContact(Contact contact) {
+        contactList.remove(contact);
         print("The record removed!");
     }
 
-    private static void showInfo() {
-        printContactList();
+    private static void listCommand() {
 
-        int index = Integer.parseInt(getStringReplyToMsg("Enter index to show info:"));
+        printList(contactList);
 
-        Contact contact = contactList.get(index - 1);
+        String reply = getStringReplyToMsg(LIST_MENU);
 
-        if (contact.isPerson()) {
-            Person person = (Person) contact;
-            print(person.toString());
+        if ("back".equals(reply)) {
+            handleMainMenuCommands();
+        } else if (isDigit(reply)) {
+            int index = Integer.parseInt(reply) - 1;
+            Contact contact = contactList.get(index);
+            print(contact.toString());
+
+            handleContactMenuCommands(contact);
         } else {
-            Organization organization = (Organization) contact;
-            print(organization.toString());
+            handleMainMenuCommands();
         }
     }
 
-    private static void printContactList() {
+    private static void printList(List<Contact> contactList) {
         for (int i = 0; i < contactList.size(); i++) {
-            print(i + 1 + ". " + contactList.get(i).getName());
+            Contact contact = contactList.get(i);
+            if (contact.isPerson()) {
+                Person person = (Person) contact;
+                print(i + 1 + ". " + person.getName() + " " + person.getSurname());
+            } else {
+                print(i + 1 + ". " + contact.getName());
+            }
         }
     }
 
@@ -183,7 +159,7 @@ public class Main {
                 break;
             default:
                 print("Unknown type");
-                print(ENTER_ACTION);
+                print(MAIN_MENU);
         }
     }
 
@@ -196,7 +172,7 @@ public class Main {
         organization.setPerson(false);
         organization.setName(name);
         organization.setAddress(address);
-        organization.setPhone(number);
+        organization.setNumber(number);
         organization.setCreatedAt(LocalDateTime.now());
         organization.setLastModifiedAt(LocalDateTime.now());
 
@@ -218,7 +194,7 @@ public class Main {
         person.setSurname(surname);
         person.setBirthday(birthDate);
         person.setGender(gender);
-        person.setPhone(number);
+        person.setNumber(number);
         person.setCreatedAt(LocalDateTime.now());
         person.setLastModifiedAt(LocalDateTime.now());
 
@@ -236,16 +212,24 @@ public class Main {
         System.out.println(text);
     }
 
+    private static boolean isDigit(String reply) {
+        return reply.matches("\\d+");
+    }
+
     static abstract class Contact {
 
         protected String name;
-        protected String phone;
+        protected String number;
         protected boolean isPerson;
         protected LocalDateTime createdAt;
         protected LocalDateTime lastModifiedAt;
 
+        protected abstract String getFieldsAbleToChange();
+
+        protected abstract void setValueByFieldName(String fieldName, String value);
+
         Contact() {
-            this.phone = "";
+            this.number = "";
         }
 
         public String getName() {
@@ -280,21 +264,21 @@ public class Main {
             this.lastModifiedAt = lastModifiedAt;
         }
 
-        public String getPhone() {
-            return hasNumber() ? phone : "[no number]";
+        public String getNumber() {
+            return hasNumber() ? number : "[no number]";
         }
 
-        public void setPhone(String phone) {
-            if (validatePhone(phone)) {
-                this.phone = phone;
+        public void setNumber(String number) {
+            if (validatePhone(number)) {
+                this.number = number;
             } else {
-                this.phone = "";
+                this.number = "";
                 print("Wrong number format!");
             }
         }
 
         public boolean hasNumber() {
-            return phone != null && !phone.trim().isEmpty();
+            return number != null && !number.trim().isEmpty();
         }
 
         private boolean validatePhone(String phone) {
@@ -318,9 +302,29 @@ public class Main {
         public String toString() {
             return "Organization name: " + getName() + "\n"
                     + "Address: " + getAddress() + "\n"
-                    + "Number: " + getPhone() + "\n"
+                    + "Number: " + getNumber() + "\n"
                     + "Time created: " + getCreatedAt() + "\n"
                     + "Time last edit: " + getLastModifiedAt();
+        }
+
+        @Override
+        public String getFieldsAbleToChange() {
+            return "(name, address, number)";
+        }
+
+        @Override
+        protected void setValueByFieldName(String fieldName, String value) {
+            switch (fieldName) {
+                case "name":
+                    this.setName(value);
+                    break;
+                case "address":
+                    this.setAddress(value);
+                    break;
+                case "number":
+                    this.setNumber(value);
+                    break;
+            }
         }
     }
 
@@ -328,6 +332,32 @@ public class Main {
         private String surname;
         private LocalDate birthday;
         private String gender;
+
+        @Override
+        public String getFieldsAbleToChange() {
+            return "(name, surname, number, birthday, gender)";
+        }
+
+        @Override
+        protected void setValueByFieldName(String fieldName, String value) {
+            switch (fieldName) {
+                case "name":
+                    this.setName(value);
+                    break;
+                case "surname":
+                    this.setSurname(value);
+                    break;
+                case "number":
+                    this.setNumber(value);
+                    break;
+                case "birthday":
+                    this.setBirthday(value);
+                    break;
+                case "gender":
+                    this.setGender(value);
+                    break;
+            }
+        }
 
         public String getSurname() {
             return surname;
@@ -378,7 +408,7 @@ public class Main {
                     + "Surname: " + getSurname() + "\n"
                     + "Birth date: " + getBirthday() + "\n"
                     + "Gender: " + getGender() + "\n"
-                    + "Number: " + getPhone() + "\n"
+                    + "Number: " + getNumber() + "\n"
                     + "Time created: " + getCreatedAt() + "\n"
                     + "Time last edit: " + getLastModifiedAt();
         }
